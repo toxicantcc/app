@@ -35,7 +35,12 @@
     ],
     "win": {
       "icon": "assets/images/icon.png",
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ]
     },
     "mac": {
       "icon": "assets/images/icon.png",

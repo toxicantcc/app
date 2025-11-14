@@ -28,13 +28,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
+      - name: Verify files exist
+        run: |
+          echo "Checking required files..."
+          if (Test-Path "assets/images/icon.png") { Write-Host "✓ icon.png exists" } else { Write-Host "✗ icon.png missing" }
+          if (Test-Path "main.js") { Write-Host "✓ main.js exists" } else { Write-Host "✗ main.js missing" }
+          if (Test-Path "preload.js") { Write-Host "✓ preload.js exists" } else { Write-Host "✗ preload.js missing" }
+      
       - name: Build Windows executable
         run: npm run build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG: electron-builder
+      
+      - name: List build artifacts
+        if: always()
+        run: |
+          Write-Host "Build artifacts:"
+          if (Test-Path "dist") {
+            Get-ChildItem -Path "dist" -Recurse | ForEach-Object { Write-Host $_.FullName }
+          } else {
+            Write-Host "dist directory does not exist"
+          }
       
       - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && success()
         uses: softprops/action-gh-release@v1
         with:
           files: |
@@ -48,17 +66,31 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload Windows artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer
           path: dist/*.exe
+          if-no-files-found: warn
           retention-days: 30
       
       - name: Upload Windows distribution
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: windows-dist
           path: dist/*.zip
           if-no-files-found: ignore
           retention-days: 30
+      
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            **/*.log
+            dist/
+          if-no-files-found: ignore
+          retention-days: 7
 
