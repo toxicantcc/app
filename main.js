@@ -314,22 +314,64 @@ ipcMain.on('open-settings-window', () => {
     createSettingsWindow();
 });
 
-ipcMain.on('settings-updated', () => {
+// 更新设置的辅助函数
+function updateSettings() {
     const store = new Store();
     const settings = store.get('settings');
-    if (view && !view.webContents.isDestroyed() && settings) {
-        if (view.webContents.getURL() !== settings.url) {
-            view.webContents.loadURL(settings.url);
-        }
-        // 在加载完成后再设置缩放，效果更好
-        view.webContents.once('did-finish-load', () => {
-            view.webContents.setZoomFactor(settings.zoom);
-        });
+    if (!settings || !settings.url) {
+        console.error('Settings or URL is missing');
+        return;
     }
+    
+    if (view && !view.webContents.isDestroyed()) {
+        const currentURL = view.webContents.getURL();
+        let newURL = settings.url.trim();
+        
+        // 确保 URL 包含协议
+        if (newURL && !newURL.match(/^https?:\/\//i)) {
+            newURL = 'https://' + newURL;
+        }
+        
+        // 规范化 URL 进行比较（移除尾部斜杠）
+        const normalizeURL = (url) => {
+            if (!url) return '';
+            return url.replace(/\/$/, '').toLowerCase();
+        };
+        
+        const normalizedCurrent = normalizeURL(currentURL);
+        const normalizedNew = normalizeURL(newURL);
+        
+        // 如果 URL 不同，加载新 URL
+        if (normalizedCurrent !== normalizedNew) {
+            console.log('URL changed from', currentURL, 'to', newURL);
+            try {
+                view.webContents.loadURL(newURL);
+                
+                // 等待加载完成后再设置缩放
+                view.webContents.once('did-finish-load', () => {
+                    if (view && !view.webContents.isDestroyed()) {
+                        view.webContents.setZoomFactor(settings.zoom || 1.0);
+                        console.log('Zoom factor set to:', settings.zoom);
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to load URL:', error);
+            }
+        } else {
+            // URL 没有变化，直接设置缩放
+            console.log('URL unchanged, updating zoom only');
+            view.webContents.setZoomFactor(settings.zoom || 1.0);
+            console.log('Zoom factor set to:', settings.zoom);
+        }
+    } else {
+        console.error('BrowserView is not available or destroyed');
+    }
+    
+    // 关闭设置窗口
     if (settingsWindow && !settingsWindow.isDestroyed()) {
         settingsWindow.close();
     }
-});
+}
 
 // --- 为设置窗口添加 IPC 监听器 ---
 
@@ -341,10 +383,11 @@ ipcMain.handle('get-settings', async () => {
 
 // 处理保存新设置的请求
 ipcMain.on('set-settings', (event, settings) => {
+    console.log('Settings received:', settings);
     const store = new Store();
     store.set('settings', settings);
-    // 通知主窗口更新内容
-    ipcMain.emit('settings-updated'); 
+    // 直接调用更新函数
+    updateSettings();
 });
 
 // 处理关闭设置窗口的请求
