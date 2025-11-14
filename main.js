@@ -315,11 +315,15 @@ ipcMain.on('open-settings-window', () => {
 });
 
 // 更新设置的辅助函数
-function updateSettings() {
+function updateSettings(newSettings = null) {
     const store = new Store();
-    const settings = store.get('settings');
+    // 如果提供了新设置，使用它；否则从 store 读取
+    const settings = newSettings || store.get('settings');
+    
+    console.log('updateSettings called with:', settings);
+    
     if (!settings || !settings.url) {
-        console.error('Settings or URL is missing');
+        console.error('Settings or URL is missing:', settings);
         return;
     }
     
@@ -386,8 +390,8 @@ ipcMain.on('set-settings', (event, settings) => {
     console.log('Settings received:', settings);
     const store = new Store();
     store.set('settings', settings);
-    // 直接调用更新函数
-    updateSettings();
+    // 直接传递设置参数，避免从 store 读取可能存在的时序问题
+    updateSettings(settings);
 });
 
 // 处理关闭设置窗口的请求
